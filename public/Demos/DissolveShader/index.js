@@ -15,7 +15,7 @@ import fs from "./fs.js";
 //GUI parameters
 const params = {
   fade: 0.0,
-  thickness: 2.0,
+  thickness: 4.0,
   brightness: 35.0,
   autoRotate: true,
   metalness: 0.13,
@@ -44,8 +44,9 @@ loadSceneBackground();
 
 // create base torus material
 let torusMaterial = new THREE.MeshStandardMaterial({
-  roughness: params.roughness,
-  metalness: params.metalness,
+    roughness: params.roughness,
+    metalness: params.metalness,
+    side: THREE.DoubleSide,
 });
 
 //load noise texture for dissolve shader
