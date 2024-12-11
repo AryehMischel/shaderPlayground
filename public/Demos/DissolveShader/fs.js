@@ -1,4 +1,4 @@
-  uniform bool dim;
+  const fs = `uniform bool dim;
   uniform float brightness;
   uniform float thickness;
   uniform bool growFade;
@@ -33,4 +33,6 @@
     }
       csm_UnlitFac =  csm_UnlitFac;
 
-  }
+  }`;
+
+  export default fs;

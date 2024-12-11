@@ -9,6 +9,10 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 
+
+//dissolve shader
+import { vs } from "./vs.glsl";
+import { fs } from "./fs.glsl";
 // Create the scene
 const scene = new THREE.Scene();
 const params = {

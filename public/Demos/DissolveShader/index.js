@@ -4,12 +4,15 @@ import CustomShaderMaterial from "three-custom-shader-material/vanilla";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 
-// Create the scene
-const scene = new THREE.Scene();
+//disolve shader
+import vs from "./vs.js";
+import fs from "./fs.js";
+
+//GUI parameters
 const params = {
   fade: 0.0,
   thickness: 2.0,
@@ -21,37 +24,36 @@ const params = {
   resolution: "2k",
   type: "HalfFloatType",
 };
-// Create a camera
-const camera = new THREE.PerspectiveCamera(
-  75,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  1000
-);
-camera.position.z = 5;
 
-let backgroundTexture = new THREE.TextureLoader().load("../../Assets/Textures/Equirectangular/spruit_sunrise_2k.hdr.jpg");
-scene.background = backgroundTexture;
+// Create amera
+const camera = createCamera();
 
-// Create a renderer and add it to the DOM
-const renderer = new THREE.WebGLRenderer();
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
-renderer.toneMapping = THREE.ACESFilmicToneMapping;  
-renderer.toneMappingExposure = 1;
-renderer.colorManagement = true;
+// Create the scene
+const scene = new THREE.Scene();
 
-// add torus
+// add lights
+addSceneLights();
 
+
+
+//create renderer
+const renderer = createRenderer();
+
+//load 360 background (not hdr)
+loadSceneBackground();
+
+// create base torus material
 let torusMaterial = new THREE.MeshStandardMaterial({
   roughness: params.roughness,
   metalness: params.metalness,
 });
 
+//load noise texture for dissolve shader
 let directionNoiseURL = "../../Assets/Textures/doubleNoise2.png";
 let directionNoise = new THREE.TextureLoader().load(directionNoiseURL);
 
-let extendedTorusMaterial = new CustomShaderMaterial({
+//create dissolve shader material
+let dissolveShaderMaterial = new CustomShaderMaterial({
   baseMaterial: torusMaterial,
   uniforms: {
     brightness: { value: 35.0 },
@@ -62,75 +64,20 @@ let extendedTorusMaterial = new CustomShaderMaterial({
     dim: { value: false },
     noiseTexture: { value: directionNoise },
   },
-  vertexShader: `
-    uniform bool growFade;
-    varying vec2 vUv;
-        uniform float brightness;
-    void main() {
-        vUv = uv;
-    }
-  `,
-  fragmentShader: `
-  uniform bool dim;
-  uniform float brightness;
-  uniform float thickness;
-  uniform bool growFade;
-  uniform float time;
-  uniform vec3 edgeColor; // Declare the uniform
-  varying vec2 vUv;
-  uniform float threshold;
-  uniform sampler2D noiseTexture; //alpha noise texture for diffuse effect
-      void main() {
-
-
-        vec3 noise = texture2D(noiseTexture, vUv).rgb;
-        float dissolve = noise.g;
-
-
-        if (dissolve < threshold) {
-          discard;
-        }
-       float edge = threshold + (thickness / 100.0);
-
-        if(threshold > 0.1){
-
-        if (dissolve < edge ) {
-
-           csm_Emissive = vec3(edgeColor.r * brightness, edgeColor.g * brightness, edgeColor.b * brightness);
-
-        } else{
-
-
-      }
-
-    }
-      csm_UnlitFac =  csm_UnlitFac;
-
-  }
-`,
+  vertexShader: vs,
+  fragmentShader: fs,
 });
 
-let boxGeometry = new THREE.BoxGeometry(1, 1, 1);
-let boxMesh = new THREE.Mesh(boxGeometry, extendedTorusMaterial);
-// scene.add(boxMesh);
-
-//default lights
-let light = new THREE.DirectionalLight(0xffffff, 1.1);
-light.position.set(0, 0, 1);
-scene.add(light);
-let AmbientLight = new THREE.AmbientLight(0xffffff, 0.5);
-scene.add(AmbientLight);
-
-
-
+//add shader material to torus
 let torusMesh = new THREE.Mesh(
   new THREE.TorusKnotGeometry(1, 0.4, 128, 128, 1, 3),
-  extendedTorusMaterial
+  dissolveShaderMaterial
 );
+
+//add torus to scene
 scene.add(torusMesh);
 
-
-//renderer for post processing
+//post processing
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 // renderPass.alpha = 0;
@@ -139,71 +86,138 @@ const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
 
 //bloom pass for post processing
-var bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.128, 0.0, 0.985);
+var bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  0.128,
+  0.0,
+  0.985
+);
 composer.addPass(bloomPass);
 
-
-
-
-let pheonixPath = "../../Assets/3D Models/phoenix.glb"
-let loader = new GLTFLoader();
-
-// loader.load(pheonixPath, function (gltf) {
-//     gltf.scene.scale.set(0.01, 0.01, 0.01);
-//     scene.add(gltf.scene);
-//     console.log("pheonix loaded");
-// });
-
+//orbit controls
 let controls = new OrbitControls(camera, renderer.domElement);
 controls.update();
 
+//gui
 const gui = new GUI();
+configureGUI();
 
-gui.add(params, "fade", 0, 1, 0.01).onChange((value) => {
-    extendedTorusMaterial.uniforms.threshold.value = value;
-})
-gui.add(params, "thickness", 0, 10, 2.00).onChange((value) => {
-    extendedTorusMaterial.uniforms.thickness.value = value;
-})
-gui.add(params, "brightness", 0, 50, 5.00).onChange((value) => {
-    extendedTorusMaterial.uniforms.brightness.value = value;
-})
-gui.add(params, "autoRotate");
-gui.add(params, "metalness", 0, 1, 0.01);
-gui.add(params, "roughness", 0, 1, 0.01);
-gui.add(params, "exposure", 0, 4, 0.01);
+// Animation loop
+function animate() {
+  requestAnimationFrame(animate);
+  torusMesh.material.roughness = params.roughness;
+  torusMesh.material.metalness = params.metalness;
+  renderer.toneMappingExposure = params.exposure;
+  composer.render();
+}
+
+animate();
 
 
-// Create color pickers for multiple color formats
-const colorFormats = {
-	string: '#0091FF',
-	int: 0x0091FF,
-	object: { r: 0, g: 0.57, b: 1 },
-	array: [ 1, 1, 1 ]
-};
 
-gui.addColor(colorFormats, 'string').name('Emissive Edge Color').onChange(function (value) {
-    // Convert the value to a THREE.Color object
-    const color = new THREE.Color(value);
-    // Update the material's uniform with the new color
-    extendedTorusMaterial.uniforms.edgeColor.value = color;
-    console.log("color changed to:", color);
-});
 
-const folder = gui.addFolder( 'Post Processing');
-folder.add(bloomPass, 'enabled').onChange(function (value) {
+
+
+
+
+
+
+
+
+
+
+
+
+//scene setup functions
+function createRenderer() {
+  const renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1;
+  renderer.colorManagement = true;
+  return renderer;
+}
+
+function createCamera() {
+  var camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+  );
+  camera.position.z = 5;
+  return camera;
+}
+
+function loadSceneBackground() {
+  let backgroundTexture = new THREE.TextureLoader().load(
+    "../../Assets/Textures/Equirectangular/spruit_sunrise_2k.hdr.jpg"
+  );
+  scene.background = backgroundTexture;
+}
+
+function addSceneLights() {
+  let light = new THREE.DirectionalLight(0xffffff, 1.1);
+  light.position.set(0, 0, 1);
+  scene.add(light);
+  let AmbientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(AmbientLight);
+}
+
+
+function configureGUI() {
+ const dissolveFolder = gui.addFolder("Dissolve Shader");
+ dissolveFolder.add(params, "fade", 0, 1, 0.01).onChange((value) => {
+    dissolveShaderMaterial.uniforms.threshold.value = value;
+  });
+  dissolveFolder.add(params, "thickness", 0, 10, 0.01).onChange((value) => {
+    dissolveShaderMaterial.uniforms.thickness.value = value;
+  });
+  dissolveFolder.add(params, "brightness", 0, 100, 0.01).onChange((value) => {
+    dissolveShaderMaterial.uniforms.brightness.value = value;
+  });
+  const baseMaterialFolder = gui.addFolder("Base Material");
+  baseMaterialFolder.add(params, "metalness", 0, 1, 0.01);
+  baseMaterialFolder.add(params, "roughness", 0, 1, 0.01);
+  const lightingFolder = gui.addFolder("Lighting");
+  lightingFolder.add(params, "exposure", 0, 4, 0.01);
+
+
+  // Create color pickers for multiple color formats
+  const colorFormats = {
+    string: "#0091FF",
+    int: 0x0091ff,
+    object: { r: 0, g: 0.57, b: 1 },
+    array: [1, 1, 1],
+  };
+
+  dissolveFolder
+    .addColor(colorFormats, "string")
+    .name("Emissive Edge Color")
+    .onChange(function (value) {
+      // Convert the value to a THREE.Color object
+      const color = new THREE.Color(value);
+      // Update the material's uniform with the new color
+      dissolveShaderMaterial.uniforms.edgeColor.value = color;
+      console.log("color changed to:", color);
+    });
+
+  const folder = gui.addFolder("Post Processing");
+  folder.add(bloomPass, "enabled").onChange(function (value) {
     bloomPass.enabled = value;
-});
-folder.add(bloomPass, 'strength', 0, 2).onChange(function (value) {
+  });
+  folder.add(bloomPass, "strength", 0, 2).onChange(function (value) {
     bloomPass.strength = value;
-});
-folder.add(bloomPass, 'radius', 0, 2).onChange(function (value) {
+  });
+  folder.add(bloomPass, "radius", 0, 2).onChange(function (value) {
     bloomPass.radius = value;
-});
-folder.add(bloomPass, 'threshold', 0, 1).onChange(function (value) {
+  });
+  folder.add(bloomPass, "threshold", 0, 1).onChange(function (value) {
     bloomPass.threshold = value;
-});
-gui.open();
+  });
+  gui.open();
+}
 
 window.addEventListener("resize", onWindowResize);
 function onWindowResize() {
@@ -212,17 +226,3 @@ function onWindowResize() {
 
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
-
-// Animation loop
-function animate() {
-  requestAnimationFrame(animate);
-  torusMesh.material.roughness = params.roughness;
-  torusMesh.material.metalness = params.metalness;
-  renderer.toneMappingExposure = params.exposure;
-  // Rotate the cube for some basic animation
-  composer.render();
-    // renderer.render(scene, camera);
-}
-
-// Start the animation loop
-animate();
