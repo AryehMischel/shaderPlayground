@@ -2,7 +2,6 @@ const path = require('path');
 
 module.exports = {
   entry: {
-    home: './public/index.js',
     dissolveShader: './public/Demos/dissolveShader/index.js',
   },
   output: {

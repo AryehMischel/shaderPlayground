@@ -14,13 +14,13 @@ import fs from "./fs.js";
 
 //GUI parameters
 const params = {
-  fade: 0.0,
+  fade: 0.70,
   thickness: 4.0,
   brightness: 35.0,
   autoRotate: true,
   metalness: 0.13,
   roughness: 0.33,
-  exposure: 0.5,
+  exposure: 0.2,
   resolution: "2k",
   type: "HalfFloatType",
 };
@@ -59,9 +59,9 @@ let dissolveShaderMaterial = new CustomShaderMaterial({
   uniforms: {
     brightness: { value: 35.0 },
     time: { value: 0.8 },
-    threshold: { value: 0.0 },
-    edgeColor: { value: new THREE.Color(0, 0.57, 1) }, // Add a uniform for the color
-    thickness: { value: 2.0 },
+    threshold: { value: 0.70 },
+    edgeColor: { value:  new THREE.Color().setHex( 0xdc1818 )}, // Add a uniform for the color
+    thickness: { value: 4.0 },
     dim: { value: false },
     noiseTexture: { value: directionNoise },
   },
@@ -182,14 +182,14 @@ function configureGUI() {
   baseMaterialFolder.add(params, "metalness", 0, 1, 0.01);
   baseMaterialFolder.add(params, "roughness", 0, 1, 0.01);
   const lightingFolder = gui.addFolder("Lighting");
-  lightingFolder.add(params, "exposure", 0, 4, 0.01);
+  lightingFolder.add(params, "exposure", 0, 1.5, 0.01);
 
 
   // Create color pickers for multiple color formats
   const colorFormats = {
-    string: "#0091FF",
-    int: 0x0091ff,
-    object: { r: 0, g: 0.57, b: 1 },
+    string: "#dc1818",
+    int: 0xdc1818,
+    object: { r: 0.863, g: 0.094, b: 0.094  },
     array: [1, 1, 1],
   };
 
